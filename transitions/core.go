@@ -1,24 +1,21 @@
-package main
+package transitions
 
 import (
-	"reflect"
 	"fmt"
 	"log"
 	"errors"
 )
 
 const (
-	Separator = "_"
-	WildcardAll = "*"
-	WildcardSame = "="
 	VERSION = "version 0.0.1"
 )
 
+// handle eventData function defined
 type HandleFunc func(ed *EventData)
 
+// handle condition eventData function defined
 type ConditionFunc func(ed *EventData) bool
 
-type TriggerFunc func(args...interface{})
 
 // state defined
 type State struct {
@@ -48,6 +45,7 @@ func (state *State) enter(eventData *EventData) error {
 	log.Printf("%s entered state %s\n", eventData.machine.name, state.name)
 	return nil
 }
+
 // exit state
 func (state *State) exit(eventData *EventData) error {
 	log.Printf("%s exiting state %s, processiong callbacks...\n", eventData.machine.name, state.name)
@@ -72,7 +70,6 @@ func (state *State) addCallback(trigger string, handle HandleFunc) error {
 }
 
 // condition defined
-
 type Condition struct {
 	handle ConditionFunc
 	target bool
@@ -104,7 +101,6 @@ type Transition struct {
 // copy transition
 type Transitions struct {
 	name string
-	trigger TriggerFunc
 	source string
 	dest string
 	prepare HandleFunc
@@ -171,27 +167,35 @@ func (tr *Transition) execute(ed *EventData) (error, bool) {
 
 // transition change state
 func (tr *Transition) changeState(ed *EventData) error {
-	ed.machine.getState(tr.source).exit(ed)
+	err, state := ed.machine.getState(tr.source)
+	if err != nil {
+		return err
+	}
+	state.exit(ed)
 	ed.machine.setState(tr.dest)
 	ed.update(ed.state.name)
-	ed.machine.getState(tr.dest).enter(ed)
+	err, state = ed.machine.getState(tr.dest)
+	if err != nil {
+		return err
+	}
+	state.enter(ed)
 	return nil
 }
 
 // transition add callback
-//func (tr *Transition) addCallback(trigger string, handle HandleFunc) error {
-//	switch trigger {
-//	case "prepare":
-//		tr.prepare = append(tr.prepare, handle)
-//	case "before":
-//		tr.before = append(tr.before, handle)
-//	case "after":
-//		tr.after = append(tr.after, handle)
-//	default:
-//		return errors.New(fmt.Sprintf("%s trigger is invalid , only 'prepare', 'before', 'after'", trigger))
-//	}
-//	return nil
-//}
+func (tr *Transition) addCallback(trigger string, handle HandleFunc) error {
+	switch trigger {
+	case "prepare":
+		tr.prepare = handle
+	case "before":
+		tr.before = handle
+	case "after":
+		tr.after = handle
+	default:
+		return errors.New(fmt.Sprintf("%s trigger is invalid , only 'prepare', 'before', 'after'", trigger))
+	}
+	return nil
+}
 
 // eventData defined
 type EventData struct {
@@ -222,8 +226,12 @@ func NewEventData(state *State, event *Event, machine *Machine, args []interface
 }
 
 // event data update
-func (ed *EventData) update(state string) error {
-	ed.state = ed.machine.getState(state)
+func (ed *EventData) update(name string) error {
+	err, state := ed.machine.getState(name)
+	if err != nil {
+		return err
+	}
+	ed.state = state
 	return nil
 }
 
@@ -262,16 +270,19 @@ func (e *Event) addCallback(trigger string, handle HandleFunc) error {
 }
 
 // event trigger
-func (e *Event) trigger(name string, args []interface{}, kw map[string]interface{}) (error, bool) {
-	state := e.machine.getState(name)
+func (e *Event) trigger(name string, args...interface{}) (error, bool) {
+	err, state := e.machine.getState(name)
+	log.Printf("enter event tigger %v", state)
+	if err != nil {
+		return err, false
+	}
 	if _, ok := e.transitions[state.name]; !ok {
 		msg := fmt.Sprintf("%s Can't trigger event %s from state %s!", e.machine.name, e.name, state.name)
 		if state.ignoreInvalidTriggers {
-			log.Fatalln(msg)
+			log.Println(msg)
 			return nil, false
 		} else {
 			panic(msg)
-
 		}
 	}
 	eventData := &EventData{
@@ -279,36 +290,42 @@ func (e *Event) trigger(name string, args []interface{}, kw map[string]interface
 		event: e,
 		machine: e.machine,
 		args: args,
-		kw: kw,
 	}
 	for _, f := range e.machine.prepareEvent {
-		e.machine.callback(f, eventData)
+		err := e.machine.callback(f, eventData)
+		if err != nil {
+			return err, false
+		}
 		log.Printf("excuted machine preparation callback '%s' before conditions.\n", f)
 	}
 
-	defer func() {
+	defer func(ed *EventData) {
 
 		if err := recover(); err != nil {
-			eventData.error = fmt.Sprintf("error: %s", err)
+			ed.error = fmt.Sprintf("error: %s", err)
 		}
 
 		for _, f := range e.machine.finalizeEvent {
-			e.machine.callback(f, eventData)
+			e.machine.callback(f, ed)
 			log.Printf("excuted machine finalize callback '%s'.\n", f)
 		}
-	}()
+	}(eventData)
 
 	for _, trans := range e.transitions[eventData.state.name] {
-		eventData.transition = &trans
+
+		var condition, unless ConditionFunc
+		for _, cond := range trans.conditions {
+			condition = cond
+		}
+		eventData.transition = NewTransition(trans.name, trans.source, trans.dest, trans.conditions, trans.unless, trans.prepare, trans.before, trans.after)
 		err, ok := trans.execute(eventData)
 		if  err != nil {
-			panic("execute error")
+			return err, false
 		}
 		if ok {
 			eventData.result = true
 			break
 		}
-
 	}
 	return nil, eventData.result
 
@@ -330,26 +347,6 @@ type Machine struct {
 	stateDynamicMethods []string
 }
 
-// actor defined
-type TransitionDescription struct {
-	name string
-	trigger HandleFunc
-	source string
-	dest string
-	before, after, prepare HandleFunc
-	condition, unless ConditionFunc
-}
-
-// 
-func convenienceTrigger(model *Machine, triggerName string, args []interface{}, kw map[string]interface{}) (err error, flag bool){
-
-	fn, _ := reflect.TypeOf(model).MethodByName(triggerName)
-	params := make([]reflect.Value, 2)
-	params[0] = reflect.ValueOf(args)
-	params[1] = reflect.ValueOf(kw)
-	fn.Func.Call(params)
-	return nil, true
-}
 
 // new machine
 func NewMachine(name, initial string, states []State, trans []Transitions, sendEvent, ignoreInvalidTriggers bool,
@@ -357,17 +354,18 @@ func NewMachine(name, initial string, states []State, trans []Transitions, sendE
 
 			m := new(Machine)
 			if name != "" {
-				m.name = name + ": "
+				m.name = "Machine <" + name + ">"
 			}
 			m.initial = NewState(initial, ignoreInvalidTriggers, nil, nil)
 
+			m.states = make(map[string]*State, len(states))
 			for _, state := range states {
-				m.states[state.name] = &state
+				m.states[state.name] = NewState(state.name, state.ignoreInvalidTriggers, state.onEnter, state.onExit)
 			}
+			m.events = make(map[string]*Event, len(trans))
 			for _, tran := range trans {
 				m.events[tran.name] = NewEvent(tran.name, m)
-				t := NewTransition(tran.name, tran.source, tran.dest, tran.unless, tran.condition,
-					tran.before, tran.after, tran.prepare)
+				t := NewTransition(tran.name, tran.source, tran.dest, tran.unless, tran.condition, tran.before, tran.after, tran.prepare)
 				m.events[tran.name].addTransition(t)
 			}
 			m.beforeStateChange = beforeStateChange
@@ -375,39 +373,53 @@ func NewMachine(name, initial string, states []State, trans []Transitions, sendE
 			m.prepareEvent = prepareEvent
 			m.finalizeEvent = finalizeEvent
 			m.sendEvent = sendEvent
+
 			return m
 }
 
-// get state
-func (m *Machine) getState(state string) *State {
-	if state, ok := m.states[state]; ok {
-		panic(fmt.Sprintf("state '%s' is not registered state", state.name))
+// machine trigger -> event trigger -> transition execute -> state onEnter and onExit
+func (m *Machine) Trigger(name string, args...interface{}) error {
+	// find trigger name
+	event, ok := m.events[name]
+	if !ok {
+		return errors.New(fmt.Sprintf("trigger name: <%s> not found on events", name))
 	}
-	return state
-}
-
-func (m *Machine) setState(state string) {
-	m.state = m.getState(state)
-}
-
-func (machine *Machine) getTriggers(states []string) []string {
-	for t, ev := range machine.events {
-		for _, state := range states {
-			if ev.
-		}
+	log.Printf("get event %v\n", event)
+	err, ok := event.trigger(m.initial.name)
+	if err != nil {
+		return err
 	}
-}
-
-func (machine *Machine) callback(handle HandleFunc, eventData *EventData) error {
-	if machine.sendEvent {
-		handle(eventData)
+	if ok {
+		log.Printf("execute result return true")
+	} else {
+		log.Printf("execute result return false")
 	}
 	return nil
 }
 
+// get state
+func (m *Machine) getState(name string) (error, *State) {
+	if state, ok := m.states[name]; ok {
+		log.Printf("states %v get name %v state %v\n", state, m.states, name)
+		return nil, state
+	}
+	return errors.New(fmt.Sprintf("state '%s' is not registered state", name)), nil
+}
 
-func main() {
+// set state
+func (m *Machine) setState(name string) error {
+	err, state := m.getState(name)
+	if err != nil {
+		return err
+	}
+	m.initial = state
+	return nil
+}
 
 
-
+func (m *Machine) callback(handle HandleFunc, eventData *EventData) error {
+	if m.sendEvent {
+		handle(eventData)
+	}
+	return nil
 }

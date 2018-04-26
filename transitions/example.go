@@ -1,4 +1,6 @@
-package main
+package transitions
+
+import "fmt"
 
 func submitOrderBefore(ed *EventData) {}
 
@@ -22,17 +24,8 @@ func backgroundProcessRefundBefore(ed *EventData) {}
 
 func backgroundProcessRefundAfter(ed *EventData) {}
 
-func SubmitOrder(args...interface{}) {}
 
-func PayForOrder(args...interface{}) {}
-
-func MoneyEnterIntoAccount(args...interface{}) {}
-
-func Refund(args...interface{}) {}
-
-func BackgroundProcessRefunding(args...interface{}) {}
-
-func main() {
+func Example() {
 
 	states := []State{
 			State{
@@ -67,7 +60,6 @@ func main() {
 	}
 	transitions := []Transitions{
 				Transitions{
-					trigger: SubmitOrder,
 					name:   "submit_order",
 					source: "initialized",
 					dest:   "submitted",
@@ -75,7 +67,6 @@ func main() {
 					after: submitOrderAfter,
 				},
 				Transitions{
-					trigger: PayForOrder,
 					name: "pay_for_order",
 					source: "submitted",
 					dest: "all_money_payed",
@@ -84,7 +75,6 @@ func main() {
 					after: payForOrderAfter,
 				},
 				Transitions{
-					trigger: MoneyEnterIntoAccount,
 					name: "money_enter_into_account",
 					source: "all_money_payed",
 					dest: "stock_up",
@@ -92,7 +82,6 @@ func main() {
 					after: moneyEnterIntoAccountAfter,
 				},
 				Transitions{
-					trigger: Refund,
 					name: "refund",
 					source: "stock_up",
 					dest: "refund_marked",
@@ -100,7 +89,6 @@ func main() {
 					after: refundAfter,
 				},
 				Transitions{
-					trigger: BackgroundProcessRefunding,
 					name: "background_process_refunding",
 					source: "refund_marked",
 					dest: "closed",
@@ -109,6 +97,11 @@ func main() {
 				},
 
 	}
-	machine := NewMachine("Stock", "initialized", states, transitions, false, false, nil, nil, nil, nil)
-
+	machine := NewMachine("Stock", "initialized", states, transitions, true, true, nil, nil, nil, nil)
+	err := machine.Trigger("submit_order")
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("success")
+	}
 }
