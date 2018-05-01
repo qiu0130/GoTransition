@@ -64,7 +64,8 @@ func Example() {
 					source: "initialized",
 					dest:   "submitted",
 					before: submitOrderBefore,
-					after: submitOrderAfter,
+					after:  submitOrderAfter,
+
 				},
 				Transitions{
 					name: "pay_for_order",

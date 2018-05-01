@@ -10,14 +10,14 @@ const (
 	VERSION = "version 0.0.1"
 )
 
-// handle eventData function defined
+// handle eventData function
 type HandleFunc func(ed *EventData)
 
-// handle condition eventData function defined
+// handle condition eventData function
 type ConditionFunc func(ed *EventData) bool
 
 
-// state defined
+// state
 type State struct {
 	name string
 	ignoreInvalidTriggers bool
@@ -38,7 +38,6 @@ func NewState(name string, ignoreInvalidTriggers bool, onEnter, onExit []HandleF
 // enter state
 func (state *State) enter(eventData *EventData) error {
 	log.Printf("%s entering state %s, processing callbacks...\n", eventData.machine.name, state.name)
-
 	for _, handle := range state.onEnter {
 		eventData.machine.callback(handle, eventData)
 	}
@@ -69,7 +68,7 @@ func (state *State) addCallback(trigger string, handle HandleFunc) error {
 	return nil
 }
 
-// condition defined
+// condition
 type Condition struct {
 	handle ConditionFunc
 	target bool
@@ -87,7 +86,7 @@ func (cd *Condition) check(ed *EventData) (bool, error) {
 	return false, errors.New("unsupported sendEvent")
 }
 
-// transition defined 
+// transition
 type Transition struct {
 	name string
 	source string
@@ -98,16 +97,16 @@ type Transition struct {
 	after HandleFunc
 }
 
-// copy transition
+// support define-use
 type Transitions struct {
 	name string
 	source string
 	dest string
+	conditions []Condition
 	prepare HandleFunc
 	before HandleFunc
 	after HandleFunc
-	condition ConditionFunc
-	unless ConditionFunc
+	condition, unless ConditionFunc
 }
 
 // new transition
@@ -197,31 +196,29 @@ func (tr *Transition) addCallback(trigger string, handle HandleFunc) error {
 	return nil
 }
 
-// eventData defined
+// eventData
 type EventData struct {
 	state *State
 	event *Event
 	machine *Machine
-	args []interface{}
-	kw map[string]interface{}
 	transition *Transition
 	error string
 	result bool
+	args []interface{}
 }
 
 // new event data
-func NewEventData(state *State, event *Event, machine *Machine, args []interface{},
-	kw map[string]interface{}, tr *Transition, error string, result bool) *EventData {
+func NewEventData(state *State, event *Event, machine *Machine, tr *Transition,
+	error string, result bool, args []interface{}) *EventData {
 
 	return &EventData{
 		state: state,
 		event: event,
 		machine: machine,
-		args: args,
-		kw: kw,
 		transition: tr,
 		error: error,
 		result: result,
+		args: args,
 	}
 }
 
@@ -235,7 +232,7 @@ func (ed *EventData) update(name string) error {
 	return nil
 }
 
-// event defined
+// event
 type Event struct {
 	name string
 	machine *Machine
@@ -313,25 +310,21 @@ func (e *Event) trigger(name string, args...interface{}) (error, bool) {
 
 	for _, trans := range e.transitions[eventData.state.name] {
 
-		var condition, unless ConditionFunc
-		for _, cond := range trans.conditions {
-			condition = cond
-		}
-		eventData.transition = NewTransition(trans.name, trans.source, trans.dest, trans.conditions, trans.unless, trans.prepare, trans.before, trans.after)
+		eventData.transition = &trans
 		err, ok := trans.execute(eventData)
 		if  err != nil {
 			return err, false
 		}
 		if ok {
 			eventData.result = true
-			break
+			return nil, true
 		}
 	}
-	return nil, eventData.result
+	return nil, false
 
 }
 
-// machine defined
+// machine
 type Machine struct {
 	name string
 	states map[string]*State
@@ -415,7 +408,6 @@ func (m *Machine) setState(name string) error {
 	m.initial = state
 	return nil
 }
-
 
 func (m *Machine) callback(handle HandleFunc, eventData *EventData) error {
 	if m.sendEvent {
