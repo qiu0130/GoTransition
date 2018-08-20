@@ -1,14 +1,10 @@
 # gotransition
 
 
-A lightweight, object-oriented finite state machine implementation in Golang
+A lightweight finite state machine implementation in Golang
+
 >>
+the process of executing
 
-the trigger function execute process
-
-machine trigger -> event trigger -> transition execute -> state onEnter and onExit
-     |                   |
-     |                   |
-     V                   |
- new machine             V
-                     eventData
+machine trigger -> event trigger -> transition execute -> state  onExit -> state change -> state onEnter 
+    
