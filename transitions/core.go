@@ -19,8 +19,6 @@ type HandleFunc func(ed *EventData)
 type ConditionFunc func(ed *EventData) bool
 
 
-
-
 func Info(format string, v...interface{}) {
 	logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 	logger.Output(2, fmt.Sprintf(format, v...))

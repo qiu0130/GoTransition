@@ -2,7 +2,6 @@ package transitions
 
 import (
 	"fmt"
-	"log"
 )
 
 type Machine struct {
@@ -19,7 +18,7 @@ type Machine struct {
 	finalizeEvent         []HandleFunc
 }
 
-// new machine
+
 func NewMachine(name, initial string, states []State, trans []Transition, sendEvent, ignoreInvalidTriggers bool,
 	beforeStateChange, afterStateChange, prepareEvent, finalizeEvent []HandleFunc) *Machine {
 
@@ -53,7 +52,7 @@ func (m *Machine) Trigger(name string, args ...interface{}) (*State, error) {
 
 	event, ok := m.events[name]
 	if !ok {
-		return nil, fmt.Errorf("trigger name: <%s> not found on events", name)
+		return nil, fmt.Errorf("trigger name <%s> not found on events", name)
 	}
 	err := event.trigger(m.currentState.name)
 	if err != nil {
@@ -64,7 +63,6 @@ func (m *Machine) Trigger(name string, args ...interface{}) (*State, error) {
 
 func (m *Machine) getState(name string) (error, *State) {
 	if state, ok := m.states[name]; ok {
-		log.Printf("states %v get name %v state %v\n", state, m.states, name)
 		return nil, state
 	}
 	return fmt.Errorf("state '%s' is not registered state", name), nil

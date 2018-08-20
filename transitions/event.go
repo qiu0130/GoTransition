@@ -2,7 +2,6 @@ package transitions
 
 import (
 	"fmt"
-	"log"
 )
 
 // current state, event, machine and transition
@@ -36,7 +35,7 @@ func (ed *EventData) update(name string) error {
 	return nil
 }
 
-// event
+
 type Event struct {
 	name        string
 	machine     *Machine
@@ -51,13 +50,13 @@ func NewEvent(name string, m *Machine) *Event {
 	}
 }
 
-// add transition
+
 func (e *Event) addTransition(tr *Transition) error {
 	e.transitions[tr.source] = append(e.transitions[tr.source], *tr)
 	return nil
 }
 
-// add callback
+
 func (e *Event) addCallback(trigger string, handle HandleFunc) error {
 	var values []Transition
 	for _, v := range e.transitions {
@@ -79,6 +78,7 @@ func (e *Event) trigger(name string, args ...interface{}) error {
 		err = fmt.Errorf("%s can't trigger event %s from state %s", e.machine.name, e.name, state.name)
 		// ignore invalid trigger err
 		if state.ignoreInvalidTriggers {
+			Error(err.Error())
 			return err
 		}
 		panic(err)
@@ -94,7 +94,7 @@ func (e *Event) trigger(name string, args ...interface{}) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("excuted machine preparation callback %q before conditions\n", f)
+		Info("executed machine preparation callback %v before conditions\n", f)
 	}
 
 	for _, trans := range e.transitions[eventData.state.name] {
@@ -108,7 +108,7 @@ func (e *Event) trigger(name string, args ...interface{}) error {
 	}
 	for _, f := range e.machine.finalizeEvent {
 		e.machine.callback(f, eventData)
-		log.Printf("excuted machine finalize callback %q\n", f)
+		Info("executed machine finalize callback %v\n", f)
 	}
 	return nil
 
