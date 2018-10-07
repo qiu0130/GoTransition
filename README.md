@@ -1,6 +1,5 @@
 # gotransition
 
-
 A lightweight, object-oriented finite state machine implementation in Golang
 
 > the trigger function execute processing

@@ -2,7 +2,6 @@ package transitions
 
 import (
 	"fmt"
-	"log"
 )
 
 type State struct {
@@ -22,20 +21,21 @@ func NewState(name string, ignoreInvalidTriggers bool, onEnter, onExit []HandleF
 }
 
 func (state *State) enter(eventData *EventData) error {
-	log.Printf("%s entering state %s, processing callbacks...\n", eventData.machine.name, state.name)
+
+	Info("%s entering state %s, processing callbacks...\n", eventData.machine.name, state.name)
 	for _, handle := range state.onEnter {
 		eventData.machine.callback(handle, eventData)
 	}
-	log.Printf("%s entered state %s\n", eventData.machine.name, state.name)
+	Info("%s entered state %s\n", eventData.machine.name, state.name)
 	return nil
 }
 
 func (state *State) exit(eventData *EventData) error {
-	log.Printf("%s exiting state %s, processiong callbacks...\n", eventData.machine.name, state.name)
+	Info("%s exiting state %s, processiong callbacks...\n", eventData.machine.name, state.name)
 	for _, handle := range state.onExit {
 		eventData.machine.callback(handle, eventData)
 	}
-	log.Printf("%s exited state %s\n", eventData.machine.name, state.name)
+	Info("%s exited state %s\n", eventData.machine.name, state.name)
 	return nil
 }
 

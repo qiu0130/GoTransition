@@ -2,7 +2,6 @@ package transitions
 
 import (
 	"fmt"
-	"log"
 )
 
 type Condition struct {
@@ -59,14 +58,14 @@ func NewTransition(name, source, destination string, condition, unless Condition
 // transition execute
 func (tr *Transition) execute(ed *EventData) error {
 
-	log.Printf("%s initiating transition from state %s to state %s\n", ed.machine.name, tr.source, tr.destination)
+	Info("%s initiating transition from state %s to state %s\n", ed.machine.name, tr.source, tr.destination)
 	ed.machine.callback(tr.prepare, ed)
-	log.Printf("executed callback %v before conditions\n", tr.prepare)
+	Info("executed callback %v before conditions\n", tr.prepare)
 
 	for _, cond := range tr.conditions {
 		err := cond.check(ed)
 		if err != nil {
-			log.Printf("%s transition codition failed: %q does not return %s\n", ed.machine.name, cond.handle, cond.target)
+			Error("%s transition condition failed: %v does not return %s\n", ed.machine.name, cond.handle, cond.target)
 			return err
 		}
 	}
@@ -74,7 +73,7 @@ func (tr *Transition) execute(ed *EventData) error {
 	beforeFunc := append(ed.machine.beforeStateChange, tr.before)
 	for _, f := range beforeFunc {
 		ed.machine.callback(f, ed)
-		log.Printf("%s executed callback %q before transition\n", ed.machine.name, f)
+		Info("%s executed callback %v before transition\n", ed.machine.name, f)
 	}
 
 	if err := tr.changeState(ed); err != nil {
@@ -90,7 +89,7 @@ func (tr *Transition) execute(ed *EventData) error {
 	}
 	for _, f := range afterFunc {
 		ed.machine.callback(f, ed)
-		log.Printf("%s executed callback %q after transition\n", ed.machine.name, f)
+		Info("%s executed callback %v after transition\n", ed.machine.name, f)
 	}
 	return nil
 }
