@@ -14,15 +14,8 @@ type EventData struct {
 	args       []interface{}
 }
 
-func NewEventData(state *State, event *Event, machine *Machine, tr *Transition, err error, args []interface{}) *EventData {
-	return &EventData{
-		state:      state,
-		event:      event,
-		machine:    machine,
-		transition: tr,
-		err:        err,
-		args:       args,
-	}
+func (ed *EventData) String() string {
+	return fmt.Sprintf("eventData<%s>", ed.event.name)
 }
 
 // update current machine state
@@ -34,7 +27,6 @@ func (ed *EventData) update(name string) error {
 	ed.state = state
 	return nil
 }
-
 
 type Event struct {
 	name        string
@@ -50,12 +42,10 @@ func NewEvent(name string, m *Machine) *Event {
 	}
 }
 
-
 func (e *Event) addTransition(tr *Transition) error {
 	e.transitions[tr.source] = append(e.transitions[tr.source], *tr)
 	return nil
 }
-
 
 func (e *Event) addCallback(trigger string, handle HandleFunc) error {
 	var values []Transition
@@ -63,7 +53,10 @@ func (e *Event) addCallback(trigger string, handle HandleFunc) error {
 		values = append(values, v...)
 	}
 	for _, v := range values {
-		v.addCallback(trigger, handle)
+		if err := v.addCallback(trigger, handle); err != nil {
+			Error(err.Error())
+			return err
+		}
 	}
 	return nil
 }
@@ -78,7 +71,7 @@ func (e *Event) trigger(name string, args ...interface{}) error {
 		err = fmt.Errorf("%s can't trigger event %s from state %s", e.machine.name, e.name, state.name)
 		// ignore invalid trigger err
 		if state.ignoreInvalidTriggers {
-			Error(err.Error())
+			Info(err.Error())
 			return err
 		}
 		panic(err)
@@ -107,7 +100,9 @@ func (e *Event) trigger(name string, args ...interface{}) error {
 		return nil
 	}
 	for _, f := range e.machine.finalizeEvent {
-		e.machine.callback(f, eventData)
+		if err := e.machine.callback(f, eventData); err != nil {
+			Error("failed to finalizeEvent bind callback on trigger")
+		}
 		Info("executed machine finalize callback %v\n", f)
 	}
 	return nil

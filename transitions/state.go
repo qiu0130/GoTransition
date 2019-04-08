@@ -13,7 +13,7 @@ type State struct {
 
 func NewState(name string, ignoreInvalidTriggers bool, onEnter, onExit []HandleFunc) *State {
 	return &State{
-		name: name,
+		name:                  name,
 		ignoreInvalidTriggers: ignoreInvalidTriggers,
 		onEnter:               onEnter,
 		onExit:                onExit,
@@ -24,18 +24,22 @@ func (state *State) enter(eventData *EventData) error {
 
 	Info("%s entering state %s, processing callbacks...\n", eventData.machine.name, state.name)
 	for _, handle := range state.onEnter {
-		eventData.machine.callback(handle, eventData)
+		if err := eventData.machine.callback(handle, eventData); err != nil {
+			Error("failed to eventData bind callback on enter")
+			return err
+		}
 	}
-	Info("%s entered state %s\n", eventData.machine.name, state.name)
 	return nil
 }
 
 func (state *State) exit(eventData *EventData) error {
-	Info("%s exiting state %s, processiong callbacks...\n", eventData.machine.name, state.name)
+	Info("%s exiting state %s, processing callbacks...\n", eventData.machine.name, state.name)
 	for _, handle := range state.onExit {
-		eventData.machine.callback(handle, eventData)
+		if err := eventData.machine.callback(handle, eventData); err != nil {
+			Error("failed to eventData bind callback on exist")
+			return err
+		}
 	}
-	Info("%s exited state %s\n", eventData.machine.name, state.name)
 	return nil
 }
 

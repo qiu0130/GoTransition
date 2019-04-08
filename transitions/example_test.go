@@ -1,10 +1,3 @@
-# gotransition
-
-> A simple finite state machine implementation in Golang, inspired by [transitions](https://github.com/pytransitions/transitions)
-
-
-## Example
-```go
 package transitions
 
 import "fmt"
@@ -169,17 +162,5 @@ func Example() {
 	// eventData<background_process_refunding> I'am BackgroundProcessRefundAfter
 	// closed
 }
-``` 
-### Callback 
 
-```
-            machine trigger
-                ↓
-            event trigger 
-                ↓
-            transition execute 
-                ↓ 
-            state onEnter 
-                ↓
-            state onExit
-```
+

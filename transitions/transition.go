@@ -58,22 +58,25 @@ func NewTransition(name, source, destination string, condition, unless Condition
 // transition execute
 func (tr *Transition) execute(ed *EventData) error {
 
-	Info("%s initiating transition from state %s to state %s\n", ed.machine.name, tr.source, tr.destination)
-	ed.machine.callback(tr.prepare, ed)
-	Info("executed callback %v before conditions\n", tr.prepare)
-
+	Info("%s initiating transition from state <%s> to state <%s>\n", ed.machine.name, tr.source, tr.destination)
+	if err := ed.machine.callback(tr.prepare, ed); err != nil {
+		Error("failed to prepare func bind callback on transition executing")
+		return err
+	}
 	for _, cond := range tr.conditions {
 		err := cond.check(ed)
 		if err != nil {
-			Error("%s transition condition failed: %v does not return %s\n", ed.machine.name, cond.handle, cond.target)
+			Error("%s transition condition failed: %v does not return %v\n", ed.machine.name, cond.handle, cond.target)
 			return err
 		}
 	}
 
 	beforeFunc := append(ed.machine.beforeStateChange, tr.before)
 	for _, f := range beforeFunc {
-		ed.machine.callback(f, ed)
-		Info("%s executed callback %v before transition\n", ed.machine.name, f)
+		if err := ed.machine.callback(f, ed); err != nil {
+			Error("failed to beforeFunc bind callback on transition executing")
+			return err
+		}
 	}
 
 	if err := tr.changeState(ed); err != nil {
@@ -88,8 +91,10 @@ func (tr *Transition) execute(ed *EventData) error {
 		afterFunc = append(afterFunc, ed.machine.afterStateChange...)
 	}
 	for _, f := range afterFunc {
-		ed.machine.callback(f, ed)
-		Info("%s executed callback %v after transition\n", ed.machine.name, f)
+		if err := ed.machine.callback(f, ed); err != nil {
+			Error("failed to afterFunc bind callback on transition executing")
+			return err
+		}
 	}
 	return nil
 }
@@ -100,16 +105,23 @@ func (tr *Transition) changeState(ed *EventData) error {
 	if err != nil {
 		return err
 	}
-	state.exit(ed)
-
-	ed.machine.setState(tr.destination)
-	ed.update(ed.state.name)
+	if err := state.exit(ed); err != nil {
+		return err
+	}
+	if err := ed.machine.setState(tr.destination); err != nil {
+		return err
+	}
+	if err := ed.update(ed.state.name); err != nil {
+		return err
+	}
 
 	err, state = ed.machine.getState(tr.destination)
 	if err != nil {
 		return err
 	}
-	state.enter(ed)
+	if err := state.enter(ed); err != nil {
+		return err
+	}
 	return nil
 }
 

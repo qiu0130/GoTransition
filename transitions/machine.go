@@ -18,13 +18,12 @@ type Machine struct {
 	finalizeEvent         []HandleFunc
 }
 
-
 func NewMachine(name, initial string, states []State, trans []Transition, sendEvent, ignoreInvalidTriggers bool,
 	beforeStateChange, afterStateChange, prepareEvent, finalizeEvent []HandleFunc) *Machine {
 
 	m := new(Machine)
 	if name != "" {
-		m.name = "Machine <" + name + ">"
+		m.name = "Machine<" + name + ">"
 	}
 	m.currentState = NewState(initial, ignoreInvalidTriggers, nil, nil)
 
@@ -36,7 +35,12 @@ func NewMachine(name, initial string, states []State, trans []Transition, sendEv
 	for _, tran := range trans {
 		m.events[tran.name] = NewEvent(tran.name, m)
 		t := NewTransition(tran.name, tran.source, tran.destination, tran.condition, tran.unless, tran.before, tran.after, tran.prepare)
-		m.events[tran.name].addTransition(t)
+
+		if m.events[tran.name].addTransition(t) != nil {
+			Error("failed to event bind transition")
+			return nil
+		}
+
 	}
 	m.beforeStateChange = beforeStateChange
 	m.afterStateChange = afterStateChange
